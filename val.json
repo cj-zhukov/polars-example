@@ -1,0 +1,27 @@
+{
+    "columns":[
+        {
+            "datatype":{
+                "Struct":[
+                    {"dtype":"Utf8","name":"val"},
+                    {"dtype":"Int32","name":"data"}
+                ]
+            },
+            "name":"metadata",
+            "values":[
+                {
+                    "bit_settings":"",
+                    "datatype":"Utf8",
+                    "name":"val",
+                    "values":["val1","val2","val3"]
+                },
+                {
+                    "bit_settings":"",
+                    "datatype":"Int32",
+                    "name":"data",
+                    "values":[42,42,43]
+                }
+            ]
+        }
+    ]
+}
