@@ -1,186 +1,44 @@
-use std::any;
+pub mod examples;
+
 use std::fs::File;
 use std::collections::HashMap;
 
+use anyhow::{Context, Result};
 use polars::prelude::*;
-use anyhow::Context;
 use serde_json::Value;
 use rayon::prelude::*;
 
-pub fn get_df() -> anyhow::Result<DataFrame> {
+pub fn get_df() -> Result<DataFrame> {
     let df = df!(
         "id" => [1, 2, 3],
         "name" => &["foo", "bar", "baz"], 
-        "data" => &[42, 42, 43], 
+        "data" => &[42, 43, 44], 
     )?;
 
     Ok(df)
 }
 
-pub fn read_data_to_df_example() {
-    let imgs = [
-        "image_1.png",
-        "image_2.png",
-    ];
-
-    let mut dfs = Vec::with_capacity(imgs.len());
-    for img in imgs.iter() {
-        let img_name = img.to_string();
-        let data_val = "data val".to_string();
-        let id = "some_id";
-        let s0 = Series::new("img_name", &[img_name.clone()]);
-        let s1 = Series::new("data_val", &[data_val]);
-        let s2 = Series::new("id", &[id]);
-        let df = DataFrame::new(vec![s0, s1, s2]).unwrap();
-        dfs.push(df);
-    }
-
-    dbg!(&dfs);
-
-    // collect all dataframes from vector into one dataframe
-    let empty_head = dfs   
-        .get(0).expect("df has len 0")
-        .clone()
-        .lazy()
-        .limit(0);
-
-    // let df = dfs
-    //     .into_iter()
-    //     .fold(empty_head, |acc, df| concat([acc, df.lazy()], false, true).unwrap())
-    //     .collect()
-    //     .unwrap();
-
-    // new version
-    let df = dfs
-        .into_iter()
-        .fold(empty_head, |acc, df| concat([acc, df.lazy()], UnionArgs { parallel: true, rechunk: true, to_supertypes: true }).unwrap())
-        .collect()
-        .unwrap();
-
-    dbg!(df);
-
-    //let df = DataFrame::new(
-    //columns.into_iter()
-    //    .map(|(name, values)| Series::new(name, values))
-    //    .collect::<Vec<_>>()
-    //).unwrap();
-}
-
-pub fn dummy_join_dfs_example() -> anyhow::Result<()> {
-    // let mut rng = rand::thread_rng();
-
-    let df1 = df!(
-                    "id" => 1..6,
-                    // "a"=> (1..6).map(|_| rng.gen::<i32>()).collect::<Vec<i32>>(),
-                    //"a"=> (1..6).map(|_| rng.gen_range(0..100)).collect::<Vec<i32>>(),
-                    "b"=> [Some(42.0), Some(42.0), None, None, Some(0.0)]
-    ).expect("should not fail").lazy();
-    
-    let df2 = df!(
-                    "id" => 1..6,
-                    "c"=> &["foo", "foo", "foo", "foo", "foo"],
-    ).expect("should not fail").lazy();
-    
-    let df3 = df!(
-                    "id" => 1..6,
-                    "d"=> &["bar", "bar", "bar", "bar", "bar"],
-    ).expect("should not fail").lazy();
-
-    // dbg!(df1, df2, df3);
-    // let dfs = vec![df1, df2, df3];
-
-    // let df = df1.select([col("id"), col("a")]).collect()?;
-    // let df = df1.select([cols(columns)]).collect()?;
-
-    // let columns = ["id"];
-    // let df = join_dfs2(dfs, &columns)?.collect()?;
-    let df = join_dfs(vec![df1, df2, df3], &["id"], None).unwrap().collect().unwrap();
-    dbg!(df);
-
-    Ok(())
-}
-
-pub fn create_struct_df() {
-    let df = df!(
+pub fn df_cols_to_struct() {
+    let mut df = df!(
         "id" => [1, 2, 3],
         "name" => &["foo", "bar", "baz"], 
-        "val" => &["val1", "val2", "val3"], 
-        "data" => &[42, 42, 43], 
+        "data" => &[42, 43, 44], 
     ).unwrap();
 
     println!("{:?}", df);
 
     let metadata = df 
-        .select(["val", "data", "name"])
+        .select(["data", "name"])
         .unwrap()
         .into_struct("metadata")
-        .into_series()
-        .into_frame();
+        .into_series();
 
-    println!("{:?}", metadata);
+    let res = df.with_column(metadata).unwrap().select(["id", "metadata"]).unwrap();
+
+    println!("{:?}", res);
 }
 
-pub fn create_df_json() -> anyhow::Result<()> {
-    let s1 = Series::new("id", &[1, 2, 3]);
-
-    let map1 = HashMap::from([
-        ("val1", 0.4),
-        ("val2", 0.7),
-        ("val3", 1.0),
-    ]);
-    let map2 = HashMap::from([
-        ("val1", 0.4),
-        ("val2", 0.7),
-    ]);
-    let map3 = HashMap::from([
-        ("val1", 0.4),
-    ]);
-    let j1 = serde_json::to_string(&map1).unwrap();
-    let j2 = serde_json::to_string(&map2).unwrap();
-    let j3 = serde_json::to_string(&map3).unwrap();
-
-    let s2 = Series::new("metadata", vec![j1, j2, j3]);
-    let df = DataFrame::new(vec![s1, s2]).unwrap();
-    println!("{:?}", df);
-
-    Ok(())
-}
-
-pub fn create_df_with_list_col() -> anyhow::Result<()> {
-    let s1 = Series::new("Fruit", &["Apple", "Ananas", "Pear"]);
-
-    let red = Series::new("Red", &[1, 1, 1]);
-    let yellow = Series::new("Yellow", &[10, 10, 10]);
-    let green = Series::new("Green", &[101, 112, 1]);
-    let colors = vec![red, yellow, green];
-    let list = Series::new("Color", colors);
-
-    let df = DataFrame::new(vec![s1, list])?;
-    dbg!(df);
-
-    Ok(())
-}
-
-pub fn join_dfs_simple(ldf: LazyFrame, other: LazyFrame, columns: &[&str], join_type: Option<&str>) -> LazyFrame {
-    let columns = columns
-        .iter()
-        .map(|x| col(x))
-        .collect::<Vec<Expr>>();
-
-    if let Some(join_type) = join_type {
-        let join_type = match join_type {
-            "inner" => JoinArgs::new(JoinType::Inner),
-            "left" => JoinArgs::new(JoinType::Left),
-            "cross" => JoinArgs::new(JoinType::Cross),
-            _ => JoinArgs::new(JoinType::Inner),
-        };
-        ldf.join(other, columns.clone(), columns.clone(), join_type)
-    } else {
-        ldf.join(other, columns.clone(), columns.clone(), JoinArgs::new(JoinType::Inner))
-    }
-}
-
-pub fn join_dfs(dfs: Vec<LazyFrame>, columns: &[&str], join_type: Option<&str>) -> anyhow::Result<LazyFrame> {    
+pub fn join_dfs(dfs: Vec<LazyFrame>, columns: &[&str], join_type: Option<&str>) -> Result<LazyFrame> {    
     let columns = columns
         .iter()
         .map(|x| col(x))
@@ -215,7 +73,7 @@ pub fn join_dfs(dfs: Vec<LazyFrame>, columns: &[&str], join_type: Option<&str>) 
     Ok(df)
 }
 
-fn join_dfs2(dfs: Vec<LazyFrame>, columns: &[&str]) -> anyhow::Result<LazyFrame> {    
+pub fn join_dfs2(dfs: Vec<LazyFrame>, columns: &[&str]) -> Result<LazyFrame> {    
     let columns = columns
         .iter()
         .map(|x| col(x))
@@ -237,34 +95,7 @@ fn join_dfs2(dfs: Vec<LazyFrame>, columns: &[&str]) -> anyhow::Result<LazyFrame>
     Ok(df)
 }
 
-// works not ok with fold
-fn join_dfs_old2(dfs: Vec<LazyFrame>, columns: &[&str]) -> anyhow::Result<LazyFrame> {
-    let head = dfs   
-        .get(0).context("df has len 0")?
-        .clone()
-        .select([cols(columns)]);
-    
-    let columns = columns
-        .iter()
-        .map(|x| col(x))
-        .collect::<Vec<Expr>>();
-
-    let df = dfs
-        .into_iter()
-        .fold(head, |acc, df| 
-            acc.join(
-                df, 
-                columns.clone(), 
-                columns.clone(), 
-                JoinType::Inner.into()))
-        .collect()
-        .context("could not join dfs")?
-        .lazy();
-
-    Ok(df)
-}
-
-pub fn concat_dfs(dfs: Vec<LazyFrame>) -> anyhow::Result<LazyFrame> {
+pub fn concat_dfs(dfs: Vec<LazyFrame>) -> Result<LazyFrame> {
     let empty_head = dfs   
         .get(0).context("df has len 0")?
         .clone()
@@ -278,32 +109,6 @@ pub fn concat_dfs(dfs: Vec<LazyFrame>) -> anyhow::Result<LazyFrame> {
         .expect("could not concat dfs"));
 
     Ok(res)
-}
-
-// fn concat_dfs_old(dfs: Vec<LazyFrame>) -> anyhow::Result<LazyFrame> {
-//     let empty_head = dfs   
-//         .get(0).context("df has len 0")?
-//         .clone()
-//         .limit(0);
-
-//     let res = dfs
-//         .into_iter()
-//         .fold(empty_head, |acc, df| concat([acc, df], false, true).expect("cannot fold when concating dfs"))
-//         .with_streaming(true);
-
-//     Ok(res)
-// }
-
-pub fn df_to_partion_example() {
-    let mut df = df!(
-        "id" => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        "name" => &["foo", "bar", "baz", "cj", "new", "one", "ccc", "xxx", "sss", "dd"], 
-    ).unwrap();
-
-    let chunk_size = 3;
-
-    let chunked_df = partition_df(&mut df, chunk_size);
-    println!("{:?}", chunked_df);
 }
 
 pub fn partition_df(df: &mut DataFrame, chunk_size: usize) -> Vec<DataFrame> {
@@ -321,13 +126,13 @@ pub fn partition_df(df: &mut DataFrame, chunk_size: usize) -> Vec<DataFrame> {
     chunked_df
 }
 
-pub fn read_csv(file_path: &str) -> anyhow::Result<DataFrame> {
+pub fn read_csv(file_path: &str) -> Result<DataFrame> {
     let df = CsvReader::from_path(file_path)?.finish()?;
     
     Ok(df)
 }
 
-pub fn read_parquet_files(files: &[&str]) -> anyhow::Result<Vec<DataFrame>> {
+pub fn read_parquet_files(files: &[&str]) -> Result<Vec<DataFrame>> {
     let mut dfs = Vec::new();
     for file in files {
         let mut file = File::open(file).unwrap();
@@ -338,7 +143,7 @@ pub fn read_parquet_files(files: &[&str]) -> anyhow::Result<Vec<DataFrame>> {
     Ok(dfs)
 }
 
-pub fn read_parquet_files_lazy(file_path: &str) -> anyhow::Result<DataFrame> {
+pub fn read_parquet_files_lazy(file_path: &str) -> Result<DataFrame> {
     let df = LazyFrame::scan_parquet(file_path, ScanArgsParquet::default())?
         .select([
             // select all columns
@@ -351,14 +156,14 @@ pub fn read_parquet_files_lazy(file_path: &str) -> anyhow::Result<DataFrame> {
     Ok(df)
 }
 
-pub fn write_to_parquet(mut df: &mut DataFrame, file_path: &str) -> anyhow::Result<()> {
+pub fn write_to_parquet(mut df: &mut DataFrame, file_path: &str) -> Result<()> {
     let mut file = File::create(file_path).context("could not create file")?;
     ParquetWriter::new(&mut file).finish(&mut df).context("could not write to file")?;
 
     Ok(())
 }
 
-pub fn df_cols_to_json(df: &mut DataFrame, cols: &[&str], new_col: Option<&str>) -> anyhow::Result<DataFrame> {
+pub fn df_cols_to_json(df: &mut DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let metadata = df
         .select(cols)?
         .into_struct("metadata")
@@ -421,7 +226,7 @@ pub fn df_cols_to_json(df: &mut DataFrame, cols: &[&str], new_col: Option<&str>)
     Ok(res.collect()?)
 }
 
-pub fn df_cols_to_json2(df: &mut DataFrame, metadata_cols: &[&str], new_col: Option<&str>) -> anyhow::Result<()> {
+pub fn df_cols_to_json2(df: &mut DataFrame, metadata_cols: &[&str], new_col: Option<&str>) -> Result<()> {
     let metadata = df
         .select(metadata_cols)?
         .into_struct("metadata")
