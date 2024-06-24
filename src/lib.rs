@@ -18,24 +18,20 @@ pub fn get_df() -> Result<DataFrame> {
     Ok(df)
 }
 
-pub fn df_cols_to_struct() {
-    let mut df = df!(
-        "id" => [1, 2, 3],
-        "name" => &["foo", "bar", "baz"], 
-        "data" => &[42, 43, 44], 
-    ).unwrap();
-
-    println!("{:?}", df);
-
-    let metadata = df 
-        .select(["data", "name"])
-        .unwrap()
-        .into_struct("metadata")
+pub fn df_cols_to_struct(df: &mut DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
+    let df_struct = df
+        .select(cols)?
+        .into_struct(new_col.unwrap_or("metadata"))
         .into_series();
 
-    let res = df.with_column(metadata).unwrap().select(["id", "metadata"]).unwrap();
+    let res = df
+        .with_column(df_struct)?
+        .clone()
+        .lazy()
+        .select([col("*").exclude(cols)])
+        .collect()?;
 
-    println!("{:?}", res);
+    Ok(res)
 }
 
 pub fn join_dfs(dfs: Vec<LazyFrame>, columns: &[&str], join_type: Option<&str>) -> Result<LazyFrame> {    
@@ -156,7 +152,7 @@ pub fn read_parquet_files_lazy(file_path: &str) -> Result<DataFrame> {
     Ok(df)
 }
 
-pub fn write_to_parquet(mut df: &mut DataFrame, file_path: &str) -> Result<()> {
+pub fn write_to_file(mut df: &mut DataFrame, file_path: &str) -> Result<()> {
     let mut file = File::create(file_path).context("could not create file")?;
     ParquetWriter::new(&mut file).finish(&mut df).context("could not write to file")?;
 
