@@ -5,6 +5,16 @@ use std::collections::HashMap;
 use anyhow::Result;
 use polars::prelude::*;
 
+pub fn get_df() -> Result<DataFrame> {
+    let df = df!(
+        "id" => [1, 2, 3],
+        "name" => &["foo", "bar", "baz"], 
+        "data" => &[42, 43, 44], 
+    )?;
+
+    Ok(df)
+}
+
 pub fn read_data_to_df_example() {
     let imgs = [
         "image_1.png",

@@ -8,20 +8,11 @@ use polars::prelude::*;
 use serde_json::Value;
 use rayon::prelude::*;
 
-pub fn get_df() -> Result<DataFrame> {
-    let df = df!(
-        "id" => [1, 2, 3],
-        "name" => &["foo", "bar", "baz"], 
-        "data" => &[42, 43, 44], 
-    )?;
-
-    Ok(df)
-}
-
+/// Create nested struct column new_cols from cols
 pub fn df_cols_to_struct(df: &mut DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let df_struct = df
         .select(cols)?
-        .into_struct(new_col.unwrap_or("metadata"))
+        .into_struct(new_col.unwrap_or("new_col"))
         .into_series();
 
     let res = df
@@ -34,6 +25,7 @@ pub fn df_cols_to_struct(df: &mut DataFrame, cols: &[&str], new_col: Option<&str
     Ok(res)
 }
 
+/// Join lazyframes
 pub fn join_dfs(dfs: Vec<LazyFrame>, columns: &[&str], join_type: Option<&str>) -> Result<LazyFrame> {    
     let columns = columns
         .iter()
@@ -91,6 +83,7 @@ pub fn join_dfs2(dfs: Vec<LazyFrame>, columns: &[&str]) -> Result<LazyFrame> {
     Ok(df)
 }
 
+/// Concat lazyframes into one lazyframe
 pub fn concat_dfs(dfs: Vec<LazyFrame>) -> Result<LazyFrame> {
     let empty_head = dfs   
         .get(0).context("df has len 0")?
@@ -107,6 +100,7 @@ pub fn concat_dfs(dfs: Vec<LazyFrame>) -> Result<LazyFrame> {
     Ok(res)
 }
 
+/// Partition dataframe by chunk
 pub fn partition_df(df: &mut DataFrame, chunk_size: usize) -> Vec<DataFrame> {
     let mut offset = 0i64;
     let mut chunked_df = Vec::new();
@@ -128,6 +122,7 @@ pub fn read_csv(file_path: &str) -> Result<DataFrame> {
     Ok(df)
 }
 
+/// Read parquet files into vector of dataframes
 pub fn read_parquet_files(files: &[&str]) -> Result<Vec<DataFrame>> {
     let mut dfs = Vec::new();
     for file in files {
@@ -152,17 +147,19 @@ pub fn read_parquet_files_lazy(file_path: &str) -> Result<DataFrame> {
     Ok(df)
 }
 
-pub fn write_to_file(mut df: &mut DataFrame, file_path: &str) -> Result<()> {
+/// Write parquet file into dataframe
+pub fn write_df_to_file(mut df: &mut DataFrame, file_path: &str) -> Result<()> {
     let mut file = File::create(file_path).context("could not create file")?;
     ParquetWriter::new(&mut file).finish(&mut df).context("could not write to file")?;
 
     Ok(())
 }
 
+/// Create string like json new_col from cols
 pub fn df_cols_to_json(df: &mut DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let metadata = df
         .select(cols)?
-        .into_struct("metadata")
+        .into_struct("new_col")
         .into_series()
         .into_frame();
 
