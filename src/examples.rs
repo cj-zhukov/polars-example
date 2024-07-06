@@ -1,4 +1,4 @@
-use crate::{join_dfs, partition_df};
+use crate::utils::{join_dfs, partition_df};
 
 use std::collections::HashMap;
 
