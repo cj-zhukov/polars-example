@@ -1,1 +1,1 @@
-Polars examples in Rust
+Polars utils, helpers and examples in Rust
